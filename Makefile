@@ -1,5 +1,13 @@
 # Go parameters
-GOCMD?=go
+HAS_RICHGO := $(shell which richgo)
+ifndef GOCMD
+ifdef HAS_RICHGO
+GOCMD=richgo
+else
+GOCMD=go
+endif
+endif
+
 GOENV=CGO_ENABLED=0
 PACK_VERSION?=dev
 PACK_BIN?=pack
