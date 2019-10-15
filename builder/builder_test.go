@@ -631,9 +631,11 @@ func testBuilder(t *testing.T, when spec.G, it spec.S) {
 						[]byte(`{
   "buildpack-1-id": {
     "buildpack-1-version-1": {
+      "layerDigest": "sha256:buildpack-1-version-1-digest",
       "layerDiffID": "sha256:buildpack-1-version-1-diff-id"
     },
     "buildpack-1-version-2": {
+      "layerDigest": "sha256:buildpack-1-version-2-digest",
       "layerDiffID": "sha256:buildpack-1-version-2-diff-id"
     }
   }
@@ -668,6 +670,7 @@ func testBuilder(t *testing.T, when spec.G, it spec.S) {
 					h.AssertEq(t, len(layers["buildpack-1-id"]), 2)
 					h.AssertEq(t, len(layers["buildpack-2-id"]), 1)
 
+					h.AssertEq(t, layers["buildpack-1-id"]["buildpack-1-version-1"].LayerDigest, "sha256:buildpack-1-version-1-digest")
 					h.AssertEq(t, layers["buildpack-1-id"]["buildpack-1-version-1"].LayerDiffID, "sha256:buildpack-1-version-1-diff-id")
 
 					h.AssertUnique(t,
@@ -675,6 +678,16 @@ func testBuilder(t *testing.T, when spec.G, it spec.S) {
 						layers["buildpack-1-id"]["buildpack-1-version-2"].LayerDiffID,
 						layers["buildpack-2-id"]["buildpack-2-version-1"].LayerDiffID,
 					)
+
+					h.AssertUnique(t,
+						layers["buildpack-1-id"]["buildpack-1-version-1"].LayerDiffID,
+						layers["buildpack-1-id"]["buildpack-1-version-2"].LayerDiffID,
+						layers["buildpack-2-id"]["buildpack-2-version-1"].LayerDiffID,
+					)
+
+					h.AssertMatch(t, layers["buildpack-1-id"]["buildpack-1-version-1"].LayerDigest, "^sha256:.*")
+					h.AssertMatch(t, layers["buildpack-1-id"]["buildpack-1-version-2"].LayerDigest, "^sha256:.*")
+					h.AssertMatch(t, layers["buildpack-2-id"]["buildpack-2-version-1"].LayerDigest, "^sha256:.*")
 
 					h.AssertEq(t, len(layers["buildpack-1-id"]["buildpack-1-version-1"].Order), 0)
 					h.AssertEq(t, len(layers["buildpack-1-id"]["buildpack-1-version-2"].Order), 0)
@@ -689,7 +702,7 @@ func testBuilder(t *testing.T, when spec.G, it spec.S) {
 					h.AssertNil(t, json.Unmarshal([]byte(label), &layers))
 
 					h.AssertContains(t, outBuf.String(), "Warning: buildpack 'buildpack-1-id@buildpack-1-version-2' already exists on builder and will be overridden")
-					h.AssertNotContains(t, layers["buildpack-1-id"]["buildpack-1-version-2"].LayerDiffID, "buildpack-1-version-2-diff-id")
+					h.AssertNotContains(t, layers["buildpack-1-id"]["buildpack-1-version-2"].LayerDigest, "buildpack-1-version-2-digest")
 				})
 			})
 

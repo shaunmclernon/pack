@@ -262,7 +262,7 @@ func (b *Builder) Save(logger logging.Logger) error {
 			)
 		}
 
-		diffID, err := dist.LayerDiffID(bpLayerTar)
+		diffID, digest, err := dist.LayerHashes(bpLayerTar)
 		if err != nil {
 			return errors.Wrapf(err,
 				"getting content hashes for buildpack %s:%s",
@@ -285,6 +285,7 @@ func (b *Builder) Save(logger logging.Logger) error {
 
 		bpLayers[bpInfo.ID][bpInfo.Version] = BuildpackLayerInfo{
 			LayerDiffID: diffID.String(),
+			LayerDigest: digest.String(),
 			Order:       bp.Descriptor().Order,
 		}
 	}

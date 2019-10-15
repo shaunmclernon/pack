@@ -112,22 +112,27 @@ func embedBuildpackTar(tw *tar.Writer, uid, gid int, bp Buildpack, baseTarDir st
 	return nil
 }
 
-func LayerDiffID(layerTarPath string) (v1.Hash, error) {
+func LayerHashes(layerTarPath string) (diffID v1.Hash, digest v1.Hash, err error) {
 	fh, err := os.Open(layerTarPath)
 	if err != nil {
-		return v1.Hash{}, errors.Wrap(err, "opening tar file")
+		return v1.Hash{}, v1.Hash{}, errors.Wrap(err, "opening tar file")
 	}
 	defer fh.Close()
 
 	layer, err := tarball.LayerFromFile(layerTarPath)
 	if err != nil {
-		return v1.Hash{}, errors.Wrap(err, "reading layer tar")
+		return v1.Hash{}, v1.Hash{}, errors.Wrap(err, "reading layer tar")
 	}
 
-	hash, err := layer.DiffID()
+	diffID, err = layer.DiffID()
 	if err != nil {
-		return v1.Hash{}, errors.Wrap(err, "generating diff id")
+		return v1.Hash{}, v1.Hash{}, errors.Wrap(err, "generating diff id")
 	}
 
-	return hash, nil
+	digest, err = layer.Digest()
+	if err != nil {
+		return v1.Hash{}, v1.Hash{}, errors.Wrap(err, "generating digest")
+	}
+
+	return diffID, digest, nil
 }
