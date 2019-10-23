@@ -243,8 +243,8 @@ func (b *Builder) Save(logger logging.Logger) error {
 		return errors.Wrap(err, "validating buildpacks")
 	}
 
-	bpLayers := BuildpackLayers{}
-	if _, err := dist.GetLabel(b.image, BuildpackLayersLabel, &bpLayers); err != nil {
+	bpLayers := dist.BuildpackLayers{}
+	if _, err := dist.GetLabel(b.image, dist.BuildpackLayersLabel, &bpLayers); err != nil {
 		return err
 	}
 
@@ -273,7 +273,7 @@ func (b *Builder) Save(logger logging.Logger) error {
 
 		bpInfo := bp.Descriptor().Info
 		if _, ok := bpLayers[bpInfo.ID]; !ok {
-			bpLayers[bpInfo.ID] = map[string]BuildpackLayerInfo{}
+			bpLayers[bpInfo.ID] = map[string]dist.BuildpackLayerInfo{}
 		}
 
 		if _, ok := bpLayers[bpInfo.ID][bpInfo.Version]; ok {
@@ -283,14 +283,14 @@ func (b *Builder) Save(logger logging.Logger) error {
 			)
 		}
 
-		bpLayers[bpInfo.ID][bpInfo.Version] = BuildpackLayerInfo{
+		bpLayers[bpInfo.ID][bpInfo.Version] = dist.BuildpackLayerInfo{
 			LayerDiffID: diffID.String(),
 			LayerDigest: digest.String(),
 			Order:       bp.Descriptor().Order,
 		}
 	}
 
-	if err := dist.SetLabel(b.image, BuildpackLayersLabel, bpLayers); err != nil {
+	if err := dist.SetLabel(b.image, dist.BuildpackLayersLabel, bpLayers); err != nil {
 		return err
 	}
 

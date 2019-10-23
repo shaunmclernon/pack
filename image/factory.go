@@ -2,6 +2,8 @@ package image
 
 import (
 	"github.com/buildpack/imgutil"
+	imglocal "github.com/buildpack/imgutil/local"
+	"github.com/buildpack/imgutil/remote"
 	"github.com/docker/docker/client"
 	"github.com/google/go-containerregistry/pkg/authn"
 )
@@ -20,8 +22,7 @@ func NewFactory(dockerClient *client.Client, keychain authn.Keychain) *DefaultIm
 
 func (f *DefaultImageFactory) NewImage(repoName string, local bool) (imgutil.Image, error) {
 	if local {
-		return imgutil.EmptyLocalImage(repoName, f.dockerClient), nil
+		return imglocal.NewImage(repoName, f.dockerClient)
 	}
-
-	return imgutil.NewRemoteImage(repoName, f.keychain)
+	return remote.NewImage(repoName, f.keychain)
 }

@@ -67,6 +67,7 @@ func (p *PackageBuilder) Save(repoName string, publish bool) (imgutil.Image, err
 	}
 	defer os.RemoveAll(tmpDir)
 
+	bpLayers := dist.BuildpackLayers{}
 	for _, bp := range p.buildpacks {
 		bpLayerTar, err := dist.BuildpackLayer(tmpDir, 0, 0, bp)
 		if err != nil {
@@ -76,9 +77,33 @@ func (p *PackageBuilder) Save(repoName string, publish bool) (imgutil.Image, err
 		if err := image.AddLayer(bpLayerTar); err != nil {
 			return nil, errors.Wrapf(err, "adding layer tar for buildpack %s", style.Symbol(bp.Descriptor().Info.ID+"@"+bp.Descriptor().Info.Version))
 		}
+
+		diffID, digest, err := dist.LayerHashes(bpLayerTar)
+		if err != nil {
+			return nil, errors.Wrapf(err,
+				"getting content hashes for buildpack %s:%s",
+				style.Symbol(bp.Descriptor().Info.ID),
+				style.Symbol(bp.Descriptor().Info.Version),
+			)
+		}
+
+		bpInfo := bp.Descriptor().Info
+		if _, ok := bpLayers[bpInfo.ID]; !ok {
+			bpLayers[bpInfo.ID] = map[string]dist.BuildpackLayerInfo{}
+		}
+
+		bpLayers[bpInfo.ID][bpInfo.Version] = dist.BuildpackLayerInfo{
+			LayerDiffID: diffID.String(),
+			LayerDigest: digest.String(),
+			Order:       bp.Descriptor().Order,
+		}
 	}
 
-	if _, err := image.Save(); err != nil {
+	if err := dist.SetLabel(image, dist.BuildpackLayersLabel, bpLayers); err != nil {
+		return nil, err
+	}
+
+	if err := image.Save(); err != nil {
 		return nil, err
 	}
 

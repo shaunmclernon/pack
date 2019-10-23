@@ -4,9 +4,6 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/buildpack/imgutil"
-	imglocal "github.com/buildpack/imgutil/local"
-	"github.com/buildpack/imgutil/remote"
 	dockerClient "github.com/docker/docker/client"
 	"github.com/google/go-containerregistry/pkg/authn"
 	"github.com/pkg/errors"
@@ -111,16 +108,4 @@ func NewClient(opts ...ClientOption) (*Client, error) {
 	client.lifecycle = build.NewLifecycle(client.docker, client.logger)
 
 	return &client, nil
-}
-
-type DefaultImageFactory struct {
-	dockerClient *dockerClient.Client
-	keychain     authn.Keychain
-}
-
-func (f *DefaultImageFactory) NewImage(repoName string, local bool) (imgutil.Image, error) {
-	if local {
-		return imglocal.NewImage(repoName, f.dockerClient)
-	}
-	return remote.NewImage(repoName, f.keychain)
 }
