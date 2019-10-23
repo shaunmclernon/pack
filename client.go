@@ -105,10 +105,7 @@ func NewClient(opts ...ClientOption) (*Client, error) {
 	}
 
 	if client.imageFactory == nil {
-		client.imageFactory = &DefaultImageFactory{
-			dockerClient: client.docker,
-			keychain:     authn.DefaultKeychain,
-		}
+		client.imageFactory = image.NewFactory(client.docker, authn.DefaultKeychain)
 	}
 
 	client.lifecycle = build.NewLifecycle(client.docker, client.logger)
