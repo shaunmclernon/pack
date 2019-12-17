@@ -40,6 +40,7 @@ import (
 
 func RandString(n int) string {
 	b := make([]byte, n)
+	rand.Seed(time.Now().UnixNano())
 	for i := range b {
 		b[i] = 'a' + byte(rand.Intn(26))
 	}
