@@ -176,6 +176,14 @@ func (b *Builder) Name() string {
 	return b.image.Name()
 }
 
+//func (b *Builder) XUID() int {
+//	return b.UID
+//}
+//
+//func (b *Builder) XGID() int {
+//	return b.GID
+//}
+
 func (b *Builder) Image() imgutil.Image {
 	return b.image
 }

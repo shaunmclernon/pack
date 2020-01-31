@@ -47,7 +47,9 @@ func init() {
 }
 
 func NewLifecycle(docker client.CommonAPIClient, logger logging.Logger) *Lifecycle {
-	return &Lifecycle{logger: logger, docker: docker}
+	l := &Lifecycle{logger: logger, docker: docker}
+
+	return l
 }
 
 type LifecycleOptions struct {
@@ -84,7 +86,7 @@ func (l *Lifecycle) Execute(ctx context.Context, opts LifecycleOptions) error {
 	}
 
 	l.logger.Info(style.Step("DETECTING"))
-	if err := l.Detect(ctx, opts.Network); err != nil {
+	if err := l.Detect(ctx, opts.Network, nil); err != nil {
 		return err
 	}
 

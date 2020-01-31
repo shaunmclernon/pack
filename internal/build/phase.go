@@ -32,7 +32,9 @@ type Phase struct {
 	appOnce  *sync.Once
 }
 
-func (l *Lifecycle) NewPhase(name string, ops ...func(*Phase) (*Phase, error)) (*Phase, error) {
+type PhaseOperation func(*Phase) (*Phase, error)
+
+func (l *Lifecycle) NewPhase(name string, ops ...PhaseOperation) (*Phase, error) {
 	ctrConf := &dcontainer.Config{
 		Image:  l.builder.Name(),
 		Labels: map[string]string{"author": "pack"},
@@ -79,14 +81,14 @@ func (l *Lifecycle) NewPhase(name string, ops ...func(*Phase) (*Phase, error)) (
 	return phase, nil
 }
 
-func WithArgs(args ...string) func(*Phase) (*Phase, error) {
+func WithArgs(args ...string) PhaseOperation {
 	return func(phase *Phase) (*Phase, error) {
 		phase.ctrConf.Cmd = append(phase.ctrConf.Cmd, args...)
 		return phase, nil
 	}
 }
 
-func WithDaemonAccess() func(*Phase) (*Phase, error) {
+func WithDaemonAccess() PhaseOperation {
 	return func(phase *Phase) (*Phase, error) {
 		phase.ctrConf.User = "root"
 		phase.hostConf.Binds = append(phase.hostConf.Binds, "/var/run/docker.sock:/var/run/docker.sock")
@@ -94,21 +96,21 @@ func WithDaemonAccess() func(*Phase) (*Phase, error) {
 	}
 }
 
-func WithRoot() func(*Phase) (*Phase, error) {
+func WithRoot() PhaseOperation {
 	return func(phase *Phase) (*Phase, error) {
 		phase.ctrConf.User = "root"
 		return phase, nil
 	}
 }
 
-func WithBinds(binds ...string) func(*Phase) (*Phase, error) {
+func WithBinds(binds ...string) PhaseOperation {
 	return func(phase *Phase) (*Phase, error) {
 		phase.hostConf.Binds = append(phase.hostConf.Binds, binds...)
 		return phase, nil
 	}
 }
 
-func WithRegistryAccess(repos ...string) func(*Phase) (*Phase, error) {
+func WithRegistryAccess(repos ...string) PhaseOperation {
 	return func(phase *Phase) (*Phase, error) {
 		authConfig, err := auth.BuildEnvVar(authn.DefaultKeychain, repos...)
 		if err != nil {
@@ -120,7 +122,7 @@ func WithRegistryAccess(repos ...string) func(*Phase) (*Phase, error) {
 	}
 }
 
-func WithNetwork(networkMode string) func(*Phase) (*Phase, error) {
+func WithNetwork(networkMode string) PhaseOperation {
 	return func(phase *Phase) (*Phase, error) {
 		phase.hostConf.NetworkMode = dcontainer.NetworkMode(networkMode)
 		return phase, nil
