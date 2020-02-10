@@ -27,7 +27,6 @@ type PhaseManager interface {
 }
 
 func (l *Lifecycle) Detect(ctx context.Context, networkMode string, phaseManager PhaseManager) error {
-	// TODO: use CreateDetect here
 	detect, err := phaseManager.New(
 		"detector",
 		phaseManager.WithArgs(

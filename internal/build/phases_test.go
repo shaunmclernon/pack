@@ -3,8 +3,11 @@ package build_test
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
+	"strings"
 	"testing"
 
 	"github.com/docker/docker/client"
@@ -13,6 +16,7 @@ import (
 
 	"github.com/buildpacks/pack/internal/build"
 	ilogging "github.com/buildpacks/pack/internal/logging"
+	"github.com/buildpacks/pack/internal/stringset"
 	h "github.com/buildpacks/pack/testhelpers"
 )
 
@@ -77,55 +81,138 @@ func TestPhases(t *testing.T) {
 }
 
 func testPhases(t *testing.T, when spec.G, it spec.S) {
-	//when("#CreateDetect", func() {
-	//	it("returns a phase", func() {
-	//		var outBuf bytes.Buffer
-	//		logger := ilogging.NewLogWithWriters(&outBuf, &outBuf)
-	//
-	//		// TODO: see if we can use a fake docker client
-	//		docker, err := client.NewClientWithOpts(client.FromEnv, client.WithVersion("1.38"))
-	//		h.AssertNil(t, err)
-	//
-	//		// TODO: see if we can use a fake builder when creating a lifecycle here
-	//		lifecycle, err := CreateFakeLifecycle(filepath.Join("testdata", "fake-app"), docker, logger)
-	//		h.AssertNil(t, err)
-	//
-	//		//var pm FakePhaseManager
-	//		//var ctx context.Context
-	//		//phase, err := lifecycle.CreateDetect(pm, ctx, "some-network-mode")
-	//		//h.AssertNotNil(t, phase)
-	//		//h.AssertNil(t, err)
-	//
-	//		// TODO: assert fake phase manager was called with correct args
-	//	})
-	//})
-
-	when("#Detect", func() {
-		it.Focus("creates a phase and then runs it", func() {
-			var outBuf bytes.Buffer
-			logger := ilogging.NewLogWithWriters(&outBuf, &outBuf)
-
-			// TODO: see if we can use a fake docker client
-			docker, err := client.NewClientWithOpts(client.FromEnv, client.WithVersion("1.38"))
-			h.AssertNil(t, err)
-
-			lifecycle, err := CreateFakeLifecycle(filepath.Join("testdata", "fake-app"), docker, logger)
-			h.AssertNil(t, err)
-
+	when.Focus("#Detect", func() {
+		it("creates a phase and then runs it", func() {
+			lifecycle := fakeLifecycle(t)
 			fakePhase := &FakePhase{}
+			fakePhaseManager := fakePhaseManager(whichReturnsForNew(fakePhase))
 
-			fakePhaseManager := &FakePhaseManager{
-				ReturnForNew: fakePhase,
-			}
-			err = lifecycle.Detect(context.Background(), "test", fakePhaseManager)
-
+			err := lifecycle.Detect(context.Background(), "test", fakePhaseManager)
 			h.AssertNil(t, err)
-			h.AssertEq(t, fakePhaseManager.NewCallCount, 1)
+
 			h.AssertEq(t, fakePhase.CleanupCallCount, 1)
 			h.AssertEq(t, fakePhase.RunCallCount, 1)
-			h.AssertEq(t, fakePhaseManager.NewCalledWithName, "detector")
+		})
 
+		it("configures the phase with the expected app and platform arguments", func() {
+			lifecycle := fakeLifecycle(t)
+			fakePhaseManager := fakePhaseManager()
+
+			err := lifecycle.Detect(context.Background(), "test", fakePhaseManager)
+			h.AssertNil(t, err)
+
+			h.AssertEq(t, fakePhaseManager.NewCalledWithName, "detector")
 			h.AssertEq(t, fakePhaseManager.WithArgsCallCount, 1)
+			assertIncludeAllExpectedArgPatterns(t,
+				fakePhaseManager.WithArgsReceived,
+				[]string{"-app", "/workspace"},
+				[]string{"-platform", "/platform"},
+			)
 		})
 	})
+}
+
+func fakeLifecycle(t *testing.T) *build.Lifecycle {
+	var outBuf bytes.Buffer
+	logger := ilogging.NewLogWithWriters(&outBuf, &outBuf)
+
+	// TODO: see if we can use a fake docker client
+	docker, err := client.NewClientWithOpts(client.FromEnv, client.WithVersion("1.38"))
+	h.AssertNil(t, err)
+
+	lifecycle, err := CreateFakeLifecycle(filepath.Join("testdata", "fake-app"), docker, logger)
+	h.AssertNil(t, err)
+
+	return lifecycle
+}
+
+func fakePhaseManager(ops ...func(*FakePhaseManager)) *FakePhaseManager {
+	fakePhaseManager := &FakePhaseManager{
+		ReturnForNew: &FakePhase{},
+	}
+
+	for _, op := range ops {
+		op(fakePhaseManager)
+	}
+
+	return fakePhaseManager
+}
+
+func whichReturnsForNew(phase build.RunnerCleaner) func(*FakePhaseManager) {
+	return func(manager *FakePhaseManager) {
+		manager.ReturnForNew = phase
+	}
+}
+
+func assertIncludeAllExpectedArgPatterns(t *testing.T, receivedArgs []string, expectedPatterns ...[]string) {
+	missingPatterns := [][]string{}
+
+	for _, expectedPattern := range expectedPatterns {
+		if !patternExists(expectedPattern, receivedArgs) {
+			missingPatterns = append(missingPatterns, expectedPattern)
+		}
+	}
+
+	assertSliceEmpty(t,
+		missingPatterns,
+		"Expected the patterns %s to exist in [%s]",
+		missingPatterns,
+		strings.Join(receivedArgs, " "),
+	)
+}
+
+func patternExists(expectedPattern []string, receivedArgs []string) bool {
+	_, missing, _ := stringset.Compare(receivedArgs, expectedPattern)
+	if len(missing) > 0 {
+		return false
+	}
+
+	if len(expectedPattern) == 1 {
+		return true
+	}
+
+	for _, loc := range matchLocations(expectedPattern[0], receivedArgs) {
+		finalElementLoc := loc + len(expectedPattern)
+
+		receivedSubSlice := receivedArgs[loc:finalElementLoc]
+
+		if reflect.DeepEqual(receivedSubSlice, expectedPattern) {
+			return true
+		}
+	}
+
+	return false
+}
+
+func matchLocations(expectedArg string, receivedArgs []string) []int {
+	indices := []int{}
+
+	for i, receivedArg := range receivedArgs {
+		if receivedArg == expectedArg {
+			indices = append(indices, i)
+		}
+	}
+
+	return indices
+}
+
+func assertSliceEmpty(t *testing.T, actual interface{}, msg string, msgArgs ...interface{}) {
+	empty, err := sliceEmpty(actual)
+
+	if err != nil {
+		t.Fatalf("assertSliceNotEmpty error: %s", err.Error())
+	}
+
+	if !empty {
+		t.Fatalf(msg, msgArgs...)
+	}
+}
+
+func sliceEmpty(slice interface{}) (bool, error) {
+	switch reflect.TypeOf(slice).Kind() {
+	case reflect.Slice:
+		return reflect.ValueOf(slice).Len() == 0, nil
+	default:
+		return true, fmt.Errorf("invoked with non slice actual: %v", slice)
+	}
 }
