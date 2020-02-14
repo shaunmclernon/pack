@@ -19,7 +19,7 @@ import (
 	"github.com/docker/go-connections/nat"
 )
 
-var registryContainerName = "registry:2"
+var registryContainerName = "micahyoung/registry:2"
 
 type TestRegistryConfig struct {
 	runRegistryName string
@@ -34,8 +34,10 @@ func RunRegistry(t *testing.T) *TestRegistryConfig {
 	t.Helper()
 
 	runRegistryName := "test-registry-" + RandString(10)
-	username := RandString(10)
-	password := RandString(10)
+	//username := RandString(10)
+	//password := RandString(10)
+	username := "ummuhhtzee"
+	password := "brufwfjdkf"
 
 	runRegistryPort := startRegistry(t, runRegistryName, username, password)
 	dockerConfigDir := setupDockerConfigWithAuth(t, username, password, runRegistryPort)
@@ -72,7 +74,11 @@ func startRegistry(t *testing.T, runRegistryName, username, password string) str
 	AssertNil(t, PullImageWithAuth(dockerCli(t), registryContainerName, ""))
 	ctx := context.Background()
 
-	htpasswdTar := generateHtpasswd(ctx, t, username, password)
+	_ = generateHtpasswd
+	//htpasswdTar := generateHtpasswd(ctx, t, username, password)
+
+	htpasswdTar, err := archive.CreateSingleFileTarReader("/registry_test_htpasswd", "ummuhhtzee:$2y$05$wd8jbPwRpwHSikKYtbMxJ.2glPfN46YM6GSU2BktYgrUtPrtLIka2")
+	AssertNil(t, err)
 
 	ctr, err := dockerCli(t).ContainerCreate(ctx, &dockercontainer.Config{
 		Image:  registryContainerName,
@@ -119,7 +125,7 @@ func generateHtpasswd(ctx context.Context, t *testing.T, username string, passwo
 	var b bytes.Buffer
 	err = RunContainer(ctx, dockerCli(t), htpasswdCtr.ID, &b, &b)
 	AssertNil(t, err)
-	reader, err := archive.CreateSingleFileTarReader("/registry_test_htpasswd", b.String())
+	reader, err := archive.CreateSingleFileTarReader("/registry_test_htpasswd", "ummuhhtzee:$2y$05$wd8jbPwRpwHSikKYtbMxJ.2glPfN46YM6GSU2BktYgrUtPrtLIka2")
 	AssertNil(t, err)
 
 	return reader
